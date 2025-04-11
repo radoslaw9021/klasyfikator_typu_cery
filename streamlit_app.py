@@ -1,38 +1,54 @@
-# streamlit_app.py
-
 import streamlit as st
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
 from PIL import Image
 
-# Stałe
+# Konfiguracja aplikacji
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['mieszana', 'naczynkowa', 'normalna', 'sucha', 'tlusta']
+st.set_page_config(page_title="Klasyfikator Typu Skóry", layout="centered")
 
-# Ustawienia aplikacji
-st.set_page_config(page_title="Skin Type Classifier", layout="centered")
-st.title("🧴 Klasyfikator Typu Skóry")
-
-# 🛡️ Informacja o prywatności
+# Nagłówek i wstęp
 st.markdown(
     """
-    🔒 **Prywatność:**  
-    Aplikacja nie zapisuje, nie przechowuje i nie przesyła Twoich zdjęć.  
-    Wszystkie obrazy są przetwarzane wyłącznie lokalnie (w pamięci przeglądarki) i usuwane po analizie.
-    Możesz bezpiecznie korzystać z uploadu lub kamery.
+    ## 👤 Klasyfikator typu skóry
+
+    🤖 Aplikacja korzysta ze sztucznej inteligencji, **wytrenowanej przeze mnie na bazie zdjęć różnych typów cery**.
+
+    📸 Wystarczy, że **zrobisz selfie lub wgrasz swoje zdjęcie**, a model spróbuje określić Twój typ skóry.
+
+    🧪 To nie jest porada medyczna — bardziej **zabawa z AI i technologią pielęgnacyjną** ✨
+
+    ### 💆‍♀️ Możliwe typy skóry:
+
+    - 🌀 **Mieszana** – przetłuszczająca się w strefie T, sucha na policzkach  
+    - 🌿 **Normalna** – zrównoważona, bez wyraźnych problemów  
+    - 💢 **Naczynkowa** – zaczerwienienia, widoczne naczynka  
+    - 🧊 **Sucha** – uczucie ściągnięcia, matowa  
+    - ✨ **Tłusta** – błyszcząca, z tendencją do wyprysków  
+
+    ---
     """,
     unsafe_allow_html=True
 )
 
-# Ładowanie modelu
+# Informacja o prywatności
+st.info(
+    "📷 **Jak to działa?** \n"
+    "Zrób zdjęcie twarzy (lub wgraj jedno), nakieruj kamerę na siebie i kliknij „Take Photo”.\n\n"
+    "🔐 **Prywatność:** Twoje zdjęcia nie są zapisywane ani przesyłane — są przetwarzane tylko w Twojej przeglądarce i znikają po odświeżeniu.",
+    icon="🔎"
+)
+
+# Wczytanie modelu
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("skin_model.keras")
 
 model = load_model()
 
-# Predykcja
+# Funkcja predykcji
 def predict_image(img):
     img = img.convert("RGB")
     img = img.resize(IMG_SIZE)
@@ -41,23 +57,42 @@ def predict_image(img):
     preds = model.predict(img_array)[0]
     return preds
 
-# Upload lub kamera
-uploaded_file = st.file_uploader("📷 Wgraj zdjęcie", type=["jpg", "jpeg", "png"])
-camera_image = st.camera_input("📸 Lub zrób zdjęcie kamerą")
+# Placeholder na dynamiczną zmianę treści
+placeholder = st.empty()
+uploaded_file = None
+camera_image = None
 
-# Przetwarzanie
+# Krok 1: upload lub kamera
+with placeholder.container():
+    st.markdown("### 📥 Wgraj zdjęcie lub użyj kamery:")
+    uploaded_file = st.file_uploader("Wybierz plik JPG/PNG", type=["jpg", "jpeg", "png"])
+    camera_image = st.camera_input("Lub zrób zdjęcie", key="camera")
+
 img_data = uploaded_file or camera_image
 
+# Krok 2: jeśli zdjęcie wgrane → pokaż wynik w tym samym miejscu
 if img_data:
     img = Image.open(img_data)
-    st.image(img, caption='Wczytane zdjęcie', use_container_width=True)
-
-    with st.spinner('🔍 Analizuję...'):
+    with st.spinner("🔍 Analizuję zdjęcie..."):
         predictions = predict_image(img)
         predicted_class = CLASS_NAMES[np.argmax(predictions)]
 
-    st.success(f"🎯 **Predykcja:** `{predicted_class.upper()}`")
+    with placeholder.container():
+        st.image(img, caption="📸 Twoje zdjęcie", use_container_width=True)
+        st.markdown(f"<h2 style='color:green; text-align:center;'>🎯 Twój typ skóry: {predicted_class.upper()}</h2>", unsafe_allow_html=True)
 
-    st.subheader("📊 Prawdopodobieństwa klas:")
-    for i, prob in enumerate(predictions):
-        st.write(f"- {CLASS_NAMES[i]}: {prob * 100:.2f}%")
+        st.markdown("### 📊 Prawdopodobieństwa klas:")
+        max_index = np.argmax(predictions)
+
+        for i, (typ, prob) in enumerate(zip(CLASS_NAMES, predictions)):
+            procent = prob * 100
+            if i == max_index:
+                st.markdown(f"🎯 <span style='color:green; font-weight:bold;'>{typ.capitalize()}</span>: <strong>{procent:.2f}%</strong>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"- <strong>{typ.capitalize()}</strong>: {procent:.2f}%", unsafe_allow_html=True)
+
+        st.markdown("---")
+        st.info("🧠 W przyszłości dobierzemy dla Twojego typu skóry spersonalizowaną profilaktykę pielęgnacyjną.")
+
+        if st.button("❌ Zamknij wynik / wróć"):
+            st.rerun()  # ✅ Nowa poprawna wersja!
