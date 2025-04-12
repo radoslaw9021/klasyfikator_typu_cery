@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
 from PIL import Image
+import time
 
 # Konfiguracja aplikacji
 IMG_SIZE = (224, 224)
@@ -57,26 +58,33 @@ def predict_image(img):
     preds = model.predict(img_array)[0]
     return preds
 
-# Placeholder na dynamiczną zmianę treści
+# 📷 Lusterko + analiza w tym samym miejscu
 placeholder = st.empty()
-uploaded_file = None
-camera_image = None
 
-# Krok 1: upload lub kamera
 with placeholder.container():
-    st.markdown("### 📥 Wgraj zdjęcie lub użyj kamery:")
-    uploaded_file = st.file_uploader("Wybierz plik JPG/PNG", type=["jpg", "jpeg", "png"])
-    camera_image = st.camera_input("Lub zrób zdjęcie", key="camera")
+    st.markdown("### 📷 Zrób zdjęcie kamerą lub wgraj plik:")
+    uploaded_file = st.file_uploader("Wybierz plik", type=["jpg", "jpeg", "png"])
+    camera_image = st.camera_input("Podgląd kamery – kliknij 'Take photo' gdy jesteś gotowy")
 
 img_data = uploaded_file or camera_image
 
-# Krok 2: jeśli zdjęcie wgrane → pokaż wynik w tym samym miejscu
 if img_data:
     img = Image.open(img_data)
-    with st.spinner("🔍 Analizuję zdjęcie..."):
-        predictions = predict_image(img)
-        predicted_class = CLASS_NAMES[np.argmax(predictions)]
 
+    # 🔬 Efekt skanowania
+    with placeholder.container():
+        st.image(img, caption="📸 Zrobione zdjęcie", use_container_width=True)
+        st.markdown("## 🔬 Skanuję cerę...")
+        progress = st.progress(0)
+        for i in range(100):
+            progress.progress(i + 1)
+            time.sleep(0.01)
+
+    # 🔍 Predykcja
+    predictions = predict_image(img)
+    predicted_class = CLASS_NAMES[np.argmax(predictions)]
+
+    # 🎯 Wynik
     with placeholder.container():
         st.image(img, caption="📸 Twoje zdjęcie", use_container_width=True)
         st.markdown(f"<h2 style='color:green; text-align:center;'>🎯 Twój typ skóry: {predicted_class.upper()}</h2>", unsafe_allow_html=True)
@@ -95,4 +103,4 @@ if img_data:
         st.info("🧠 W przyszłości dobierzemy dla Twojego typu skóry spersonalizowaną profilaktykę pielęgnacyjną.")
 
         if st.button("❌ Zamknij wynik / wróć"):
-            st.rerun()  # ✅ Nowa poprawna wersja!
+            st.rerun()
