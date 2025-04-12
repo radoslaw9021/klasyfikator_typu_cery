@@ -1,55 +1,26 @@
+
 import streamlit as st
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
 from PIL import Image
 import time
+from produkty import produkty, Produkt
 
-# Konfiguracja aplikacji
+# Stałe
 IMG_SIZE = (224, 224)
 CLASS_NAMES = ['mieszana', 'naczynkowa', 'normalna', 'sucha', 'tlusta']
+
 st.set_page_config(page_title="Klasyfikator Typu Skóry", layout="centered")
 
-# Nagłówek i wstęp
-st.markdown(
-    """
-    ## 👤 Klasyfikator typu skóry
-
-    🤖 Aplikacja korzysta ze sztucznej inteligencji, **wytrenowanej przeze mnie na bazie zdjęć różnych typów cery**.
-
-    📸 Wystarczy, że **zrobisz selfie lub wgrasz swoje zdjęcie**, a model spróbuje określić Twój typ skóry.
-
-    🧪 To nie jest porada medyczna — bardziej **zabawa z AI i technologią pielęgnacyjną** ✨
-
-    ### 💆‍♀️ Możliwe typy skóry:
-
-    - 🌀 **Mieszana** – przetłuszczająca się w strefie T, sucha na policzkach  
-    - 🌿 **Normalna** – zrównoważona, bez wyraźnych problemów  
-    - 💢 **Naczynkowa** – zaczerwienienia, widoczne naczynka  
-    - 🧊 **Sucha** – uczucie ściągnięcia, matowa  
-    - ✨ **Tłusta** – błyszcząca, z tendencją do wyprysków  
-
-    ---
-    """,
-    unsafe_allow_html=True
-)
-
-# Informacja o prywatności
-st.info(
-    "📷 **Jak to działa?** \n"
-    "Zrób zdjęcie twarzy (lub wgraj jedno), nakieruj kamerę na siebie i kliknij „Take Photo”.\n\n"
-    "🔐 **Prywatność:** Twoje zdjęcia nie są zapisywane ani przesyłane — są przetwarzane tylko w Twojej przeglądarce i znikają po odświeżeniu.",
-    icon="🔎"
-)
-
-# Wczytanie modelu
+# Wczytywanie modelu
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model("skin_model.keras")
 
 model = load_model()
 
-# Funkcja predykcji
+# Predykcja
 def predict_image(img):
     img = img.convert("RGB")
     img = img.resize(IMG_SIZE)
@@ -58,49 +29,93 @@ def predict_image(img):
     preds = model.predict(img_array)[0]
     return preds
 
-# 📷 Lusterko + analiza w tym samym miejscu
+# Rekomendacje ogólne
+def rekomendacja_pielegnacji(top1, score1, top2, score2, gender, age):
+    tekst = f"**Twoja cera wykazuje cechy typu: {top1.capitalize()} ({int(score1 * 100)}%)**.\n\n"
+    if abs(score1 - score2) < 0.15 and top2 != top1:
+        tekst += f"Dodatkowo widoczne są cechy typu: **{top2.capitalize()} ({int(score2 * 100)}%)**.\n\n"
+
+    opisy = {
+        'tlusta': "Błyszczenie, zaskórniki i przetłuszczanie to typowe objawy skóry tłustej.",
+        'sucha': "Suchość, szorstkość i uczucie ściągnięcia to cechy skóry suchej.",
+        'mieszana': "Skóra przetłuszcza się w strefie T, ale bywa sucha na policzkach.",
+        'normalna': "Zrównoważona, elastyczna skóra — ale wciąż potrzebuje pielęgnacji.",
+        'naczynkowa': "Zaczerwienienia, wrażliwość i widoczne naczynka to typowe objawy."
+    }
+    tekst += f"{opisy.get(top1, '')}\n\n"
+
+    if gender == "Mężczyzna":
+        tekst += "🧔 Dla mężczyzn polecam łagodne kosmetyki bezzapachowe i produkty po goleniu bez alkoholu.\n\n"
+    else:
+        tekst += "💄 Zadbaj o dokładny demakijaż i łagodną pielęgnację, dopasowaną do typu cery.\n\n"
+
+    if age < 25:
+        tekst += "🧴 W młodym wieku postaw na lekkość, matowienie i regularne oczyszczanie.\n"
+    elif age <= 40:
+        tekst += "🌿 Buduj świadomą rutynę pielęgnacyjną — serum, krem i SPF codziennie.\n"
+    else:
+        tekst += "🌟 Skóra dojrzała wymaga regeneracji, antyoksydantów i ceramidów.\n"
+
+    tekst += "\n### 📝 **Jak stosować produkty:**\n"
+    tekst += "- Regularność jest kluczem – aplikuj produkty zgodnie z instrukcjami.\n"
+    tekst += "- Rano i wieczorem staraj się stosować odpowiedni krem nawilżający i serum.\n"
+    tekst += "- W przypadku produktów z SPF, nakładaj je na dzień, a wieczorem skup się na regeneracji skóry."
+
+    return tekst
+
+# Interfejs
+st.title("🧴 Klasyfikator Typu Skóry")
+st.info("📷 Wgraj zdjęcie lub użyj kamery – po analizie otrzymasz typ skóry oraz rekomendacje dopasowane do Ciebie.")
+
+gender = st.radio("👤 Wybierz płeć", ["Kobieta", "Mężczyzna"], horizontal=True)
+age = st.slider("🎂 Wiek", 15, 80, 30)
+
 placeholder = st.empty()
 
 with placeholder.container():
-    st.markdown("### 📷 Zrób zdjęcie kamerą lub wgraj plik:")
     uploaded_file = st.file_uploader("Wybierz plik", type=["jpg", "jpeg", "png"])
-    camera_image = st.camera_input("Podgląd kamery – kliknij 'Take photo' gdy jesteś gotowy")
+    camera_image = st.camera_input("Zrób zdjęcie kamerą")
 
 img_data = uploaded_file or camera_image
 
 if img_data:
     img = Image.open(img_data)
 
-    # 🔬 Efekt skanowania
     with placeholder.container():
-        st.image(img, caption="📸 Zrobione zdjęcie", use_container_width=True)
-        st.markdown("## 🔬 Skanuję cerę...")
+        st.image(img, caption="📸 Twoje zdjęcie", use_container_width=True)
+        st.write("🔬 Analizuję cerę...")
         progress = st.progress(0)
         for i in range(100):
             progress.progress(i + 1)
-            time.sleep(0.01)
+            time.sleep(0.005)
 
-    # 🔍 Predykcja
     predictions = predict_image(img)
-    predicted_class = CLASS_NAMES[np.argmax(predictions)]
+    top_indices = np.argsort(predictions)[::-1]
+    top1, top2 = CLASS_NAMES[top_indices[0]], CLASS_NAMES[top_indices[1]]
+    score1, score2 = predictions[top_indices[0]], predictions[top_indices[1]]
 
-    # 🎯 Wynik
     with placeholder.container():
         st.image(img, caption="📸 Twoje zdjęcie", use_container_width=True)
-        st.markdown(f"<h2 style='color:green; text-align:center;'>🎯 Twój typ skóry: {predicted_class.upper()}</h2>", unsafe_allow_html=True)
-
-        st.markdown("### 📊 Prawdopodobieństwa klas:")
-        max_index = np.argmax(predictions)
-
-        for i, (typ, prob) in enumerate(zip(CLASS_NAMES, predictions)):
-            procent = prob * 100
-            if i == max_index:
-                st.markdown(f"🎯 <span style='color:green; font-weight:bold;'>{typ.capitalize()}</span>: <strong>{procent:.2f}%</strong>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"- <strong>{typ.capitalize()}</strong>: {procent:.2f}%", unsafe_allow_html=True)
+        st.markdown("### 📊 **Prawdopodobieństwa typów skóry:**")
+        for idx in top_indices:
+            st.write(f"- **{CLASS_NAMES[idx].capitalize()}**: {predictions[idx] * 100:.2f}%")
 
         st.markdown("---")
-        st.info("🧠 W przyszłości dobierzemy dla Twojego typu skóry spersonalizowaną profilaktykę pielęgnacyjną.")
+        st.markdown("### 📝 **Rekomendacje pielęgnacyjne:**")
+        rec = rekomendacja_pielegnacji(top1, score1, top2, score2, gender, age)
+        st.markdown(rec)
+
+        st.markdown("---")
+        st.markdown("### 🛍️ **Proponowane produkty pielęgnacyjne:**")
+        produkty_dla_uzytkownika = produkty.get(top1, {}).get(gender, [])
+        for produkt in produkty_dla_uzytkownika:
+            with st.expander(f"💄 {produkt.name}"):
+                st.markdown(f"💰 **{produkt.price}**")
+                st.markdown(f"🧴 {produkt.desc}")
+                st.markdown(f"[🔗 Zobacz produkt]({produkt.link})")
+                st.markdown(f"🏷️ Kategoria: {produkt.kategoria}")
+                st.markdown(f"⭐ Ocena: {produkt.ocena}/5")
+                st.markdown(f"💡 **Jak stosować**: Aplikuj produkt na oczyszczoną skórę 2 razy dziennie (rano i wieczorem).")
 
         if st.button("❌ Zamknij wynik / wróć"):
             st.rerun()
